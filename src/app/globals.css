@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0d12;
+  --color-panel: #121620;
+  --color-panel-2: #1a2030;
+  --color-border: #263045;
+  --color-muted: #8b96ad;
+  --color-fg: #e7ebf3;
+  --color-accent: #7c5cff;
+  --color-accent-2: #ff4d8d;
+  --color-success: #2fd28c;
+  --color-danger: #ff5c5c;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  @apply rounded-2xl border border-border bg-panel p-6 shadow-[0_10px_40px_-20px_rgba(0,0,0,0.8)];
+}
+
+.label {
+  @apply mb-1.5 block text-sm font-medium text-muted;
+}
+
+.input {
+  @apply w-full rounded-xl border border-border bg-panel-2 px-3.5 py-2.5 text-fg outline-none transition
+    placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/30;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition
+    disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply bg-accent text-white hover:brightness-110 active:brightness-95;
+}
+
+.btn-secondary {
+  @apply border border-border bg-panel-2 text-fg hover:border-muted/60;
+}
+
+.btn-danger {
+  @apply border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium;
+}
+
+.alert-error {
+  @apply rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger;
+}
+
+.alert-success {
+  @apply rounded-xl border border-success/40 bg-success/10 px-4 py-3 text-sm text-success;
+}
+
+.alert-warn {
+  @apply rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-300;
+}
