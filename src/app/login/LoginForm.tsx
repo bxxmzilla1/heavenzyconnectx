@@ -13,12 +13,12 @@ export function LoginForm({ next }: { next: string }) {
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
       <div>
-        <label htmlFor="passcode" className="label">
-          Passcode
+        <label htmlFor="password" className="label">
+          Password
         </label>
         <input
-          id="passcode"
-          name="passcode"
+          id="password"
+          name="password"
           type="password"
           autoComplete="current-password"
           autoFocus

@@ -14,22 +14,22 @@ function safeNext(next: unknown): string {
 }
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const passcode = String(formData.get("passcode") ?? "");
+  const password = String(formData.get("password") ?? "");
   const next = safeNext(formData.get("next"));
 
-  if (!passcode) return { error: "Enter the passcode." };
+  if (!password) return { error: "Enter the password." };
 
   let expected: string;
   try {
-    expected = env.adminPasscode;
+    expected = env.adminPassword;
   } catch {
-    return { error: "ADMIN_PASSCODE is not configured on the server." };
+    return { error: "ADMIN_PASSWORD is not configured on the server." };
   }
 
-  if (!safeEqual(passcode, expected)) {
+  if (!safeEqual(password, expected)) {
     // Small delay to blunt brute-force attempts.
     await new Promise((r) => setTimeout(r, 400));
-    return { error: "Incorrect passcode." };
+    return { error: "Incorrect password." };
   }
 
   await createAdminSession();

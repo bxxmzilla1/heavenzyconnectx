@@ -18,8 +18,8 @@ export const env = {
   get supabaseServiceRoleKey() {
     return required("SUPABASE_SERVICE_ROLE_KEY");
   },
-  get adminPasscode() {
-    return required("ADMIN_PASSCODE");
+  get adminPassword() {
+    return required("ADMIN_PASSWORD");
   },
   get sessionSecret() {
     return required("SESSION_SECRET");

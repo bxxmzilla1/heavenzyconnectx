@@ -21,7 +21,7 @@ export function verifyPasscode(passcode: string, stored: string | null | undefin
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-/** Constant-time comparison for the admin passcode (stored as plain env var). */
+/** Constant-time comparison for the admin password (stored as plain env var). */
 export function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a.normalize("NFKC"));
   const bb = Buffer.from(b.normalize("NFKC"));

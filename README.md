@@ -6,7 +6,7 @@ A small Next.js app that gives you shareable pages (`https://yourdomain.com/<slu
 2. sends the visitor through bundle.social's Instagram OAuth flow,
 3. renames that team to the connected Instagram username.
 
-Pages can be protected with their own passcode, and the admin area is protected with a global passcode. Everything is stored in Supabase.
+Pages can be protected with their own passcode, and the admin area is protected with a password (`ADMIN_PASSWORD` env var). Everything is stored in Supabase.
 
 ## Stack
 
@@ -33,7 +33,7 @@ Copy `.env.example` to `.env.local` for local development and set the same value
 | --- | --- | --- |
 | `SUPABASE_URL` | yes | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Supabase service-role key (server only) |
-| `ADMIN_PASSCODE` | yes | Passcode to open `/admin` |
+| `ADMIN_PASSWORD` | yes | Password to open `/admin` |
 | `SESSION_SECRET` | yes | Random string used to sign session cookies |
 | `ENCRYPTION_KEY` | yes | Random string used to encrypt the bundle.social API key at rest |
 | `NEXT_PUBLIC_SITE_URL` | no | Public origin, e.g. `https://connect.yourdomain.com`. Derived from the request when omitted. |
@@ -51,7 +51,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>, sign in with `ADMIN_PASSCODE`, then go to **Settings** and paste your bundle.social API key (created in the bundle.social dashboard under *API Keys*). The key is verified against the API before it is saved.
+Open <http://localhost:3000>, sign in with `ADMIN_PASSWORD`, then go to **Settings** and paste your bundle.social API key (created in the bundle.social dashboard under *API Keys*). The key is verified against the API before it is saved.
 
 ## 4. Deploy to Vercel
 
@@ -71,10 +71,10 @@ No `vercel.json` is needed. All routes run on the Node.js runtime; the admin gat
 ## How it works
 
 ```
-/admin                 pages list + create form (admin passcode)
+/admin                 pages list + create form (admin password)
 /admin/pages/[id]      edit title/slug, set/remove passcode, delete, connection history
 /admin/settings        bundle.social API key (encrypted), Instagram connection options
-/login                 admin passcode
+/login                 admin password
 /[slug]                public page: optional passcode wall → big Connect button
 /api/connect/start     POST { slug } → creates a placeholder team, returns bundle.social OAuth URL
 /api/connect/callback  bundle.social redirects here → reads the Instagram account → renames team
@@ -98,6 +98,6 @@ No `vercel.json` is needed. All routes run on the Node.js runtime; the admin gat
 ## Security notes
 
 - Admin and page sessions are HMAC-signed, HttpOnly cookies (`SESSION_SECRET`).
-- Page passcodes are hashed with scrypt; the admin passcode is compared in constant time.
+- Page passcodes are hashed with scrypt; the admin password is compared in constant time.
 - The bundle.social API key is stored AES-256-GCM encrypted (`ENCRYPTION_KEY`) and only decrypted server-side.
 - All pages send `noindex`.

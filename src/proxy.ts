@@ -4,7 +4,7 @@ import { verifyToken } from "@/lib/tokens";
 const ADMIN_COOKIE = "bcp_admin";
 
 /**
- * Gate the admin area behind the admin passcode session cookie.
+ * Gate the admin area behind the admin password session cookie.
  * Everything else (public connect pages, login, connect API) is handled by
  * the routes themselves.
  */
