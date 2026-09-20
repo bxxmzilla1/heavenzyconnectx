@@ -4,18 +4,10 @@ import { deletePageAction, removePagePasscodeAction } from "@/actions/pages";
 import { CopyButton } from "@/components/CopyButton";
 import { getPageById, listConnectionsForPage } from "@/lib/db";
 import { getSiteUrl } from "@/lib/session";
-import type { ConnectionRow } from "@/lib/supabase";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { EditPageForm, PasscodeForm } from "./forms";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_STYLE: Record<ConnectionRow["status"], string> = {
-  connected: "border-success/40 bg-success/10 text-success",
-  pending: "border-border text-muted",
-  needs_channel: "border-amber-400/40 bg-amber-400/10 text-amber-300",
-  failed: "border-danger/40 bg-danger/10 text-danger",
-};
 
 export default async function PageDetail({
   params,
@@ -29,6 +21,7 @@ export default async function PageDetail({
   if (!page) notFound();
 
   const [connections, siteUrl] = await Promise.all([listConnectionsForPage(id), getSiteUrl()]);
+  const connected = connections.filter((c) => c.status === "connected");
   const url = `${siteUrl}/${page.slug}`;
 
   return (
@@ -79,11 +72,10 @@ export default async function PageDetail({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Connections</h2>
         <p className="text-sm text-muted">
-          Every click on the Connect button creates a bundle.social team. Once Instagram is connected the team is renamed to the
-          Instagram username.
+          Instagram accounts connected through this page. Each one has its own bundle.social team named after the account.
         </p>
-        {connections.length === 0 ? (
-          <p className="card text-sm text-muted">No connection attempts yet.</p>
+        {connected.length === 0 ? (
+          <p className="card text-sm text-muted">No accounts connected yet.</p>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-border bg-panel">
             <table className="w-full text-sm">
@@ -91,23 +83,18 @@ export default async function PageDetail({
                 <tr className="border-b border-border">
                   <th className="px-4 py-3">Instagram</th>
                   <th className="px-4 py-3">Team</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">When</th>
+                  <th className="px-4 py-3">Connected</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {connections.map((c) => (
+                {connected.map((c) => (
                   <tr key={c.id}>
                     <td className="px-4 py-3 font-medium">{c.instagram_username ? `@${c.instagram_username}` : "—"}</td>
                     <td className="px-4 py-3">
                       <div>{c.team_name ?? "—"}</div>
                       <div className="font-mono text-xs text-muted">{c.team_id}</div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`badge ${STATUS_STYLE[c.status]}`}>{c.status.replace("_", " ")}</span>
-                      {c.error_code && <div className="mt-1 font-mono text-xs text-muted">{c.error_code}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-muted">{new Date(c.created_at).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-muted">{new Date(c.updated_at).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
