@@ -100,9 +100,6 @@ export function ConnectScreen({ slug, title, initial }: { slug: string; title: s
             <span className="text-2xl font-bold sm:text-3xl">{busy ? "Opening…" : "Connect"}</span>
             <span className="text-sm font-medium text-white/80">your Instagram</span>
           </button>
-          <p className="mt-10 max-w-sm text-center text-sm text-muted">
-            You will be sent to Instagram to log in and approve access. Your password is never shared with us.
-          </p>
         </>
       )}
 
