@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deletePageAction, removePagePasscodeAction } from "@/actions/pages";
+import { deletePageAction, removePagePasscodeAction, resetConnectionsAction } from "@/actions/pages";
 import { CopyButton } from "@/components/CopyButton";
 import { getPageById, listConnectionsForPage } from "@/lib/db";
 import { getSiteUrl } from "@/lib/session";
@@ -77,7 +77,22 @@ export default async function PageDetail({
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">Connections</h2>
-          {usernameList && <CopyButton text={usernameList} label={`Copy ${connected.length} username${connected.length === 1 ? "" : "s"}`} />}
+          {connected.length > 0 && (
+            <div className="flex items-center gap-2">
+              {usernameList && (
+                <CopyButton text={usernameList} label={`Copy ${connected.length} username${connected.length === 1 ? "" : "s"}`} />
+              )}
+              <form action={resetConnectionsAction}>
+                <input type="hidden" name="id" value={page.id} />
+                <ConfirmSubmit
+                  className="btn btn-danger"
+                  message="Reset the username list for this page? The bundle.social teams and connected Instagram accounts are not affected."
+                >
+                  Reset list
+                </ConfirmSubmit>
+              </form>
+            </div>
+          )}
         </div>
         <p className="text-sm text-muted">
           Instagram accounts connected through this page. Each one has its own bundle.social team named after the account.

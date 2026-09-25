@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hashPasscode } from "@/lib/crypto";
-import { createPage, deletePage, getPageById, isUniqueViolation, updatePage } from "@/lib/db";
+import { createPage, deleteConnectionsForPage, deletePage, getPageById, isUniqueViolation, updatePage } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 import { normaliseSlug, validateSlug } from "@/lib/slug";
 import { errorMessage, type ActionState } from "./types";
@@ -83,6 +83,14 @@ export async function removePagePasscodeAction(formData: FormData): Promise<void
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   await updatePage(id, { passcode_hash: null });
+  revalidatePath("/admin");
+  revalidatePath(`/admin/pages/${id}`);
+}
+
+export async function resetConnectionsAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  await deleteConnectionsForPage(id);
   revalidatePath("/admin");
   revalidatePath(`/admin/pages/${id}`);
 }

@@ -79,6 +79,11 @@ export async function listConnectionsForPage(pageId: string): Promise<Connection
   return (data ?? []) as ConnectionRow[];
 }
 
+export async function deleteConnectionsForPage(pageId: string): Promise<void> {
+  const { error } = await supabaseAdmin().from("connections").delete().eq("page_id", pageId);
+  if (error) throw error;
+}
+
 export async function getConnection(id: string): Promise<ConnectionRow | null> {
   const { data, error } = await supabaseAdmin().from("connections").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
