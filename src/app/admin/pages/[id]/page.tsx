@@ -22,6 +22,11 @@ export default async function PageDetail({
 
   const [connections, siteUrl] = await Promise.all([listConnectionsForPage(id), getSiteUrl()]);
   const connected = connections.filter((c) => c.status === "connected");
+  const usernameList = connected
+    .map((c) => c.instagram_username)
+    .filter((u): u is string => Boolean(u))
+    .map((u) => `@${u}`)
+    .join("\n");
   const url = `${siteUrl}/${page.slug}`;
 
   return (
@@ -70,7 +75,10 @@ export default async function PageDetail({
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Connections</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Connections</h2>
+          {usernameList && <CopyButton text={usernameList} label={`Copy ${connected.length} username${connected.length === 1 ? "" : "s"}`} />}
+        </div>
         <p className="text-sm text-muted">
           Instagram accounts connected through this page. Each one has its own bundle.social team named after the account.
         </p>
