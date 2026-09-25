@@ -5,6 +5,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { getPageById, listConnectionsForPage } from "@/lib/db";
 import { getSiteUrl } from "@/lib/session";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { SubmitButton } from "@/components/SubmitButton";
 import { EditPageForm, PasscodeForm } from "./forms";
 
 export const dynamic = "force-dynamic";
@@ -84,12 +85,9 @@ export default async function PageDetail({
               )}
               <form action={resetConnectionsAction}>
                 <input type="hidden" name="id" value={page.id} />
-                <ConfirmSubmit
-                  className="btn btn-danger"
-                  message="Reset the username list for this page? The bundle.social teams and connected Instagram accounts are not affected."
-                >
+                <SubmitButton className="btn btn-danger" pendingText="Resetting…">
                   Reset list
-                </ConfirmSubmit>
+                </SubmitButton>
               </form>
             </div>
           )}
