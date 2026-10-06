@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { bundle } from "@/lib/bundle";
 import { extractCallbackError, failConnection, finalizeConnection, toChannelOptions } from "@/lib/connect";
-import { getBundleApiKey, getConnection, getPageById, updateConnection } from "@/lib/db";
+import { getBundleApiKeyForPage, getConnection, getPageById, updateConnection } from "@/lib/db";
 import { getSiteUrl } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${pageUrl}?status=error&code=${encodeURIComponent(connection.error_code ?? "no-account")}`);
   }
 
-  const apiKey = await getBundleApiKey();
+  const apiKey = await getBundleApiKeyForPage(page);
   if (!apiKey) {
     await failConnection(null, connection, "not-configured");
     return NextResponse.redirect(`${pageUrl}?status=error&code=not-configured`);

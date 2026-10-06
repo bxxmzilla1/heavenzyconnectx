@@ -12,9 +12,13 @@ create table if not exists public.pages (
   slug          text not null unique,
   title         text not null,
   passcode_hash text,                       -- null = no passcode required
+  bundle_api_key_enc text,                  -- page-specific bundle.social key (encrypted); null = use global key
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
+
+-- For databases created before per-page API keys existed.
+alter table public.pages add column if not exists bundle_api_key_enc text;
 
 create index if not exists pages_slug_idx on public.pages (slug);
 

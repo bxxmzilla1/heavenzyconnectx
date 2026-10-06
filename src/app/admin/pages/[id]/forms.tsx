@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { setPagePasscodeAction, updatePageAction } from "@/actions/pages";
+import { savePageApiKeyAction, setPagePasscodeAction, updatePageAction } from "@/actions/pages";
 import { initialActionState } from "@/actions/types";
 import { ActionMessage } from "@/components/ActionMessage";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -38,6 +38,34 @@ export function EditPageForm({ page, siteUrl }: { page: { id: string; title: str
       </div>
       <ActionMessage state={state} />
       <SubmitButton>Save changes</SubmitButton>
+    </form>
+  );
+}
+
+export function PageApiKeyForm({ pageId, hasKey }: { pageId: string; hasKey: boolean }) {
+  const [state, action] = useActionState(savePageApiKeyAction, initialActionState);
+
+  return (
+    <form action={action} className="space-y-3">
+      <input type="hidden" name="id" value={pageId} />
+      <div>
+        <label htmlFor="apiKey" className="label">
+          {hasKey ? "Replace this page's API key" : "API key for this page"}
+        </label>
+        <input
+          id="apiKey"
+          name="apiKey"
+          type="password"
+          required
+          autoComplete="off"
+          className="input font-mono"
+          placeholder="pk_live_…"
+        />
+      </div>
+      <ActionMessage state={state} />
+      <SubmitButton className="btn btn-secondary" pendingText="Verifying…">
+        {hasKey ? "Verify & replace" : "Verify & save"}
+      </SubmitButton>
     </form>
   );
 }

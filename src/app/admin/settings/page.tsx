@@ -17,10 +17,11 @@ export default async function SettingsPage() {
 
       <section className="card space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">bundle.social API key</h2>
+          <h2 className="text-lg font-semibold">Global bundle.social API key</h2>
           <p className="mt-1 text-sm text-muted">
-            Create a key in your bundle.social dashboard under <em>API Keys</em>. It is verified against the API before being saved
-            and stored encrypted.
+            Used by every page that does not have its own key (set one on a page&apos;s admin screen to override it). Create a key in
+            your bundle.social dashboard under <em>API Keys</em>. It is verified against the API before being saved and stored
+            encrypted.
           </p>
         </div>
 

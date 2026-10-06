@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bundle } from "@/lib/bundle";
-import { createConnection, getBundleApiKey, getPageBySlug, getSettings, updateConnection } from "@/lib/db";
+import { createConnection, getBundleApiKeyForPage, getPageBySlug, getSettings, updateConnection } from "@/lib/db";
 import { getSiteUrl, hasPageAccess } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Passcode required." }, { status: 401 });
   }
 
-  const apiKey = await getBundleApiKey();
+  const apiKey = await getBundleApiKeyForPage(page);
   if (!apiKey) return NextResponse.json({ error: "not-configured" }, { status: 503 });
 
   const settings = await getSettings();

@@ -46,7 +46,7 @@ export async function createPage(input: { slug: string; title: string; passcode_
 
 export async function updatePage(
   id: string,
-  patch: Partial<Pick<PageRow, "slug" | "title" | "passcode_hash">>,
+  patch: Partial<Pick<PageRow, "slug" | "title" | "passcode_hash" | "bundle_api_key_enc">>,
 ): Promise<PageRow> {
   const { data, error } = await supabaseAdmin()
     .from("pages")
@@ -56,6 +56,20 @@ export async function updatePage(
     .single();
   if (error) throw error;
   return data as PageRow;
+}
+
+export async function setPageApiKey(id: string, apiKey: string | null): Promise<void> {
+  await updatePage(id, { bundle_api_key_enc: apiKey ? encryptSecret(apiKey) : null });
+}
+
+/** Last 4 characters of the page's own API key, or null if it uses the global key. */
+export function pageApiKeyHint(page: PageRow): string | null {
+  if (!page.bundle_api_key_enc) return null;
+  try {
+    return decryptSecret(page.bundle_api_key_enc).slice(-4);
+  } catch {
+    return "????";
+  }
 }
 
 export async function deletePage(id: string): Promise<void> {
@@ -165,6 +179,12 @@ export async function getBundleApiKey(): Promise<string | null> {
   const row = await getSettingsRow();
   if (!row?.bundle_api_key_enc) return null;
   return decryptSecret(row.bundle_api_key_enc);
+}
+
+/** The page's own API key if it has one, otherwise the global key from Settings. */
+export async function getBundleApiKeyForPage(page: PageRow): Promise<string | null> {
+  if (page.bundle_api_key_enc) return decryptSecret(page.bundle_api_key_enc);
+  return getBundleApiKey();
 }
 
 export async function saveSettings(patch: {

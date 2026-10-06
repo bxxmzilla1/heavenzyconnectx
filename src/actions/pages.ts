@@ -3,7 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hashPasscode } from "@/lib/crypto";
-import { createPage, deleteConnectionsForPage, deletePage, getPageById, isUniqueViolation, updatePage } from "@/lib/db";
+import { bundle, BundleApiError } from "@/lib/bundle";
+import {
+  createPage,
+  deleteConnectionsForPage,
+  deletePage,
+  getPageById,
+  isUniqueViolation,
+  setPageApiKey,
+  updatePage,
+} from "@/lib/db";
 import { isAdmin } from "@/lib/session";
 import { normaliseSlug, validateSlug } from "@/lib/slug";
 import { errorMessage, type ActionState } from "./types";
@@ -83,6 +92,44 @@ export async function removePagePasscodeAction(formData: FormData): Promise<void
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
   await updatePage(id, { passcode_hash: null });
+  revalidatePath("/admin");
+  revalidatePath(`/admin/pages/${id}`);
+}
+
+export async function savePageApiKeyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+
+  const id = String(formData.get("id") ?? "");
+  const apiKey = String(formData.get("apiKey") ?? "").trim();
+  const page = await getPageById(id);
+  if (!page) return { error: "Page not found." };
+  if (!apiKey) return { error: "Paste a bundle.social API key." };
+  if (apiKey.length < 10) return { error: "That does not look like a valid API key." };
+
+  let orgName: string;
+  try {
+    orgName = (await bundle.getOrganization(apiKey)).name;
+  } catch (err) {
+    if (err instanceof BundleApiError && (err.status === 401 || err.status === 403)) {
+      return { error: "bundle.social rejected that API key. Double-check it and try again." };
+    }
+    return { error: `Could not verify the key with bundle.social: ${errorMessage(err)}` };
+  }
+
+  try {
+    await setPageApiKey(id, apiKey);
+  } catch (err) {
+    return { error: errorMessage(err) };
+  }
+  revalidatePath("/admin");
+  revalidatePath(`/admin/pages/${id}`);
+  return { success: `Key verified (organization "${orgName}") and saved for this page.` };
+}
+
+export async function clearPageApiKeyAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  await setPageApiKey(id, null);
   revalidatePath("/admin");
   revalidatePath(`/admin/pages/${id}`);
 }

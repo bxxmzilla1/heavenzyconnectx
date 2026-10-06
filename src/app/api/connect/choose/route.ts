@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { bundle } from "@/lib/bundle";
 import { finalizeConnection } from "@/lib/connect";
-import { getBundleApiKey, getConnection, getPageById } from "@/lib/db";
+import { getBundleApiKeyForPage, getConnection, getPageById } from "@/lib/db";
 import { hasPageAccess } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const channel = connection.channels?.find((ch) => ch.id === channelId);
   if (!channel) return NextResponse.json({ error: "Unknown account." }, { status: 400 });
 
-  const apiKey = await getBundleApiKey();
+  const apiKey = await getBundleApiKeyForPage(page);
   if (!apiKey) return NextResponse.json({ error: "not-configured" }, { status: 503 });
 
   try {

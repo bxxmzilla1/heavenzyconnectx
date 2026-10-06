@@ -23,7 +23,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
 
       {!settings.hasApiKey && (
         <p className="alert-warn">
-          No bundle.social API key configured yet. Connect buttons will not work until you add one in{" "}
+          No global bundle.social API key configured. Pages without their own key will not work until you add one in{" "}
           <Link href="/admin/settings" className="underline">
             Settings
           </Link>
@@ -57,6 +57,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                       ) : (
                         <span className="badge border-border text-muted">Public</span>
                       )}
+                      {p.bundle_api_key_enc && <span className="badge border-success/40 bg-success/10 text-success">Own API key</span>}
                     </div>
                     <a href={url} target="_blank" rel="noreferrer" className="mt-0.5 block truncate text-sm text-muted hover:text-fg">
                       {url}

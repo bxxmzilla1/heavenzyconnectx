@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deletePageAction, removePagePasscodeAction, resetConnectionsAction } from "@/actions/pages";
+import { clearPageApiKeyAction, deletePageAction, removePagePasscodeAction, resetConnectionsAction } from "@/actions/pages";
 import { CopyButton } from "@/components/CopyButton";
-import { getPageById, listConnectionsForPage } from "@/lib/db";
+import { getPageById, getSettings, listConnectionsForPage, pageApiKeyHint } from "@/lib/db";
 import { getSiteUrl } from "@/lib/session";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { SubmitButton } from "@/components/SubmitButton";
-import { EditPageForm, PasscodeForm } from "./forms";
+import { EditPageForm, PageApiKeyForm, PasscodeForm } from "./forms";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,8 @@ export default async function PageDetail({
   const page = await getPageById(id);
   if (!page) notFound();
 
-  const [connections, siteUrl] = await Promise.all([listConnectionsForPage(id), getSiteUrl()]);
+  const [connections, siteUrl, settings] = await Promise.all([listConnectionsForPage(id), getSiteUrl(), getSettings()]);
+  const keyHint = pageApiKeyHint(page);
   const connected = connections.filter((c) => c.status === "connected");
   const usernameList = connected
     .map((c) => c.instagram_username)
@@ -74,6 +75,42 @@ export default async function PageDetail({
           )}
         </section>
       </div>
+
+      <section className="card space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">bundle.social API key</h2>
+          <p className="mt-1 text-sm text-muted">
+            Connections from this page create teams in the bundle.social organization that owns this key.
+          </p>
+        </div>
+        {keyHint ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-success/30 bg-success/5 px-4 py-3">
+            <div className="text-sm">
+              <span className="text-success">Using this page&apos;s own key</span>{" "}
+              <span className="font-mono text-muted">••••••••{keyHint}</span>
+            </div>
+            <form action={clearPageApiKeyAction}>
+              <input type="hidden" name="id" value={page.id} />
+              <ConfirmSubmit
+                className="btn btn-secondary"
+                message="Remove this page's API key? The page will fall back to the global key from Settings."
+              >
+                Use global key instead
+              </ConfirmSubmit>
+            </form>
+          </div>
+        ) : settings.hasApiKey ? (
+          <p className="rounded-xl border border-border bg-panel-2 px-4 py-3 text-sm text-muted">
+            Using the global key from Settings <span className="font-mono">••••••••{settings.apiKeyHint}</span>. Add a key below to
+            use a different bundle.social account for this page.
+          </p>
+        ) : (
+          <p className="alert-warn">
+            No key for this page and no global key in Settings. The Connect button will not work until you add one.
+          </p>
+        )}
+        <PageApiKeyForm pageId={page.id} hasKey={Boolean(keyHint)} />
+      </section>
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">

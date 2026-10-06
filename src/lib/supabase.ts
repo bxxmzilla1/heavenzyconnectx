@@ -7,6 +7,8 @@ export type PageRow = {
   slug: string;
   title: string;
   passcode_hash: string | null;
+  /** Page-specific bundle.social API key (encrypted). Null = use the global key from Settings. */
+  bundle_api_key_enc: string | null;
   created_at: string;
   updated_at: string;
 };
