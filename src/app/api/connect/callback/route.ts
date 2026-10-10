@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
 import { bundle } from "@/lib/bundle";
-import { extractCallbackError, failConnection, finalizeConnection, toChannelOptions } from "@/lib/connect";
-import { getBundleApiKeyForPage, getConnection, getPageById, updateConnection } from "@/lib/db";
+import {
+  extractCallbackError,
+  failConnection,
+  finalizeConnection,
+  finalizePostpeerConnection,
+  toChannelOptions,
+} from "@/lib/connect";
+import { getApiKeyForPage, getConnection, getPageById, updateConnection } from "@/lib/db";
+import { postpeer } from "@/lib/postpeer";
 import { getSiteUrl } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/connect/callback?c=<connectionId>&<bundle.social params>
- * bundle.social sends the visitor here after the Instagram OAuth flow.
+ * GET /api/connect/callback?c=<connectionId>&<provider params>
+ * bundle.social / PostPeer send the visitor here after the Instagram OAuth flow.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -31,10 +38,26 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${pageUrl}?status=error&code=${encodeURIComponent(connection.error_code ?? "no-account")}`);
   }
 
-  const apiKey = await getBundleApiKeyForPage(page);
+  const provider = connection.provider === "postpeer" ? "postpeer" : "bundle";
+  const apiKey = await getApiKeyForPage(page, provider);
   if (!apiKey) {
     await failConnection(null, connection, "not-configured");
     return NextResponse.redirect(`${pageUrl}?status=error&code=not-configured`);
+  }
+
+  if (provider === "postpeer") {
+    let integration = null;
+    try {
+      integration = (await postpeer.listInstagramIntegrations(apiKey, connection.team_id))[0] ?? null;
+    } catch (err) {
+      console.error("[connect/callback] postpeer integrations failed", err);
+    }
+    if (!integration) {
+      await failConnection(apiKey, connection, "no-account");
+      return NextResponse.redirect(`${pageUrl}?status=error&code=no-account`);
+    }
+    const { username } = await finalizePostpeerConnection(apiKey, connection, integration);
+    return NextResponse.redirect(`${pageUrl}?status=connected&u=${encodeURIComponent(username)}`);
   }
 
   const callbackError = extractCallbackError(url.searchParams);

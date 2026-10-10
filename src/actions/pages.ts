@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hashPasscode } from "@/lib/crypto";
-import { bundle, BundleApiError } from "@/lib/bundle";
+import { PROVIDER_LABEL, type Provider } from "@/lib/supabase";
+import { verifyProviderKey } from "@/lib/verify-key";
 import {
   createPage,
   deleteConnectionsForPage,
@@ -100,38 +101,50 @@ export async function savePageApiKeyAction(_prev: ActionState, formData: FormDat
   await requireAdmin();
 
   const id = String(formData.get("id") ?? "");
+  const provider = parseProvider(formData.get("provider"));
   const apiKey = String(formData.get("apiKey") ?? "").trim();
   const page = await getPageById(id);
   if (!page) return { error: "Page not found." };
-  if (!apiKey) return { error: "Paste a bundle.social API key." };
+  if (!apiKey) return { error: `Paste a ${PROVIDER_LABEL[provider]} API key.` };
   if (apiKey.length < 10) return { error: "That does not look like a valid API key." };
 
-  let orgName: string;
-  try {
-    orgName = (await bundle.getOrganization(apiKey)).name;
-  } catch (err) {
-    if (err instanceof BundleApiError && (err.status === 401 || err.status === 403)) {
-      return { error: "bundle.social rejected that API key. Double-check it and try again." };
-    }
-    return { error: `Could not verify the key with bundle.social: ${errorMessage(err)}` };
-  }
+  const check = await verifyProviderKey(provider, apiKey);
+  if (!check.ok) return { error: check.error };
 
   try {
-    await setPageApiKey(id, apiKey);
+    await setPageApiKey(id, provider, apiKey);
   } catch (err) {
     return { error: errorMessage(err) };
   }
   revalidatePath("/admin");
   revalidatePath(`/admin/pages/${id}`);
-  return { success: `Key verified (organization "${orgName}") and saved for this page.` };
+  return { success: `Key verified (${check.detail}) and saved for this page.` };
 }
 
 export async function clearPageApiKeyAction(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = String(formData.get("id") ?? "");
-  await setPageApiKey(id, null);
+  await setPageApiKey(id, parseProvider(formData.get("provider")), null);
   revalidatePath("/admin");
   revalidatePath(`/admin/pages/${id}`);
+}
+
+export async function setPageProviderAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const provider = parseProvider(formData.get("provider"));
+  try {
+    await updatePage(id, { provider });
+  } catch (err) {
+    return { error: errorMessage(err) };
+  }
+  revalidatePath("/admin");
+  revalidatePath(`/admin/pages/${id}`);
+  return { success: `This page now connects through ${PROVIDER_LABEL[provider]}.` };
+}
+
+function parseProvider(value: FormDataEntryValue | null): Provider {
+  return value === "postpeer" ? "postpeer" : "bundle";
 }
 
 export async function resetConnectionsAction(formData: FormData): Promise<void> {

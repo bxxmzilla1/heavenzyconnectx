@@ -2,45 +2,44 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { bundle, BundleApiError } from "@/lib/bundle";
-import { getBundleApiKey, saveSettings } from "@/lib/db";
+import { getBundleApiKey, getPostpeerApiKey, saveSettings } from "@/lib/db";
 import { isAdmin } from "@/lib/session";
-import type { InstagramConnectionMethod } from "@/lib/supabase";
+import { PROVIDER_LABEL, type InstagramConnectionMethod, type Provider } from "@/lib/supabase";
+import { verifyProviderKey } from "@/lib/verify-key";
 import { errorMessage, type ActionState } from "./types";
 
 async function requireAdmin() {
   if (!(await isAdmin())) redirect("/login");
 }
 
+function parseProvider(value: FormDataEntryValue | null): Provider {
+  return value === "postpeer" ? "postpeer" : "bundle";
+}
+
 export async function saveApiKeyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireAdmin();
+  const provider = parseProvider(formData.get("provider"));
   const apiKey = String(formData.get("apiKey") ?? "").trim();
-  if (!apiKey) return { error: "Paste your bundle.social API key." };
+  if (!apiKey) return { error: `Paste your ${PROVIDER_LABEL[provider]} API key.` };
   if (apiKey.length < 10) return { error: "That does not look like a valid API key." };
 
-  // Validate the key against the API before storing it.
-  try {
-    await bundle.getOrganization(apiKey);
-  } catch (err) {
-    if (err instanceof BundleApiError && (err.status === 401 || err.status === 403)) {
-      return { error: "bundle.social rejected that API key. Double-check it and try again." };
-    }
-    return { error: `Could not verify the key with bundle.social: ${errorMessage(err)}` };
-  }
+  const check = await verifyProviderKey(provider, apiKey);
+  if (!check.ok) return { error: check.error };
 
   try {
-    await saveSettings({ apiKey });
+    await saveSettings(provider === "postpeer" ? { postpeerApiKey: apiKey } : { apiKey });
   } catch (err) {
     return { error: errorMessage(err) };
   }
   revalidatePath("/admin/settings");
   revalidatePath("/admin");
-  return { success: "API key verified and saved." };
+  return { success: `API key verified (${check.detail}) and saved.` };
 }
 
-export async function clearApiKeyAction(): Promise<void> {
+export async function clearApiKeyAction(formData: FormData): Promise<void> {
   await requireAdmin();
-  await saveSettings({ apiKey: null });
+  const provider = parseProvider(formData.get("provider"));
+  await saveSettings(provider === "postpeer" ? { postpeerApiKey: null } : { apiKey: null });
   revalidatePath("/admin/settings");
   revalidatePath("/admin");
 }
@@ -61,15 +60,11 @@ export async function saveConnectOptionsAction(_prev: ActionState, formData: For
   return { success: "Connection options saved." };
 }
 
-export async function testConnectionAction(_prev: ActionState): Promise<ActionState> {
+export async function testConnectionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireAdmin();
-  const apiKey = await getBundleApiKey();
+  const provider = parseProvider(formData.get("provider"));
+  const apiKey = provider === "postpeer" ? await getPostpeerApiKey() : await getBundleApiKey();
   if (!apiKey) return { error: "No API key saved yet." };
-  try {
-    const org = await bundle.getOrganization(apiKey);
-    const teams = org.teams?.length ?? 0;
-    return { success: `Connected to organization "${org.name}" (${teams} team${teams === 1 ? "" : "s"}).` };
-  } catch (err) {
-    return { error: `bundle.social returned an error: ${errorMessage(err)}` };
-  }
+  const check = await verifyProviderKey(provider, apiKey);
+  return check.ok ? { success: `Connected to ${check.detail}.` } : { error: check.error };
 }

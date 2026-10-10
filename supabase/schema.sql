@@ -62,6 +62,21 @@ create table if not exists public.settings (
 insert into public.settings (id) values ('default') on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
+-- PostPeer provider (bundle.social remains the default per page).
+-- For PostPeer connections, connections.team_id holds the PostPeer profile id.
+-- ---------------------------------------------------------------------------
+alter table public.pages
+  add column if not exists provider text not null default 'bundle'
+  check (provider in ('bundle', 'postpeer'));
+alter table public.pages add column if not exists postpeer_api_key_enc text;
+
+alter table public.connections
+  add column if not exists provider text not null default 'bundle'
+  check (provider in ('bundle', 'postpeer'));
+
+alter table public.settings add column if not exists postpeer_api_key_enc text;
+
+-- ---------------------------------------------------------------------------
 -- Security: the app talks to Supabase exclusively with the service-role key
 -- from the server. Enabling RLS with no policies locks the anon/public key
 -- out of every table entirely.

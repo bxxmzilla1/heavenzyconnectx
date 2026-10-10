@@ -5,25 +5,28 @@ import { saveApiKeyAction, saveConnectOptionsAction, testConnectionAction } from
 import { initialActionState } from "@/actions/types";
 import { ActionMessage } from "@/components/ActionMessage";
 import { SubmitButton } from "@/components/SubmitButton";
+import type { Provider } from "@/lib/providers";
 import type { InstagramConnectionMethod } from "@/lib/supabase";
 
-export function ApiKeyForm({ hasKey }: { hasKey: boolean }) {
+export function ApiKeyForm({ provider, hasKey }: { provider: Provider; hasKey: boolean }) {
   const [state, action] = useActionState(saveApiKeyAction, initialActionState);
+  const inputId = `apiKey-${provider}`;
 
   return (
     <form action={action} className="space-y-3">
+      <input type="hidden" name="provider" value={provider} />
       <div>
-        <label htmlFor="apiKey" className="label">
+        <label htmlFor={inputId} className="label">
           {hasKey ? "Replace API key" : "API key"}
         </label>
         <input
-          id="apiKey"
+          id={inputId}
           name="apiKey"
           type="password"
           required
           autoComplete="off"
           className="input font-mono"
-          placeholder="pk_live_…"
+          placeholder={provider === "postpeer" ? "PostPeer access key" : "pk_live_…"}
         />
       </div>
       <ActionMessage state={state} />
@@ -32,10 +35,11 @@ export function ApiKeyForm({ hasKey }: { hasKey: boolean }) {
   );
 }
 
-export function TestConnectionButton() {
+export function TestConnectionButton({ provider }: { provider: Provider }) {
   const [state, action] = useActionState(testConnectionAction, initialActionState);
   return (
     <form action={action} className="flex items-center gap-3">
+      <input type="hidden" name="provider" value={provider} />
       <SubmitButton className="btn btn-secondary" pendingText="Testing…">
         Test connection
       </SubmitButton>

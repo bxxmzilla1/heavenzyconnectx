@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { bundle } from "@/lib/bundle";
-import { createConnection, getBundleApiKeyForPage, getPageBySlug, getSettings, updateConnection } from "@/lib/db";
+import { createConnection, getApiKeyForPage, getPageBySlug, getSettings, pageProvider, updateConnection } from "@/lib/db";
+import { postpeer } from "@/lib/postpeer";
 import { getSiteUrl, hasPageAccess } from "@/lib/session";
+import { PROVIDER_LABEL } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/connect/start  { slug }
- * Creates a fresh bundle.social team for this attempt and returns the OAuth URL.
+ * Creates a fresh bundle.social team (or PostPeer profile) for this attempt and returns the OAuth URL.
  */
 export async function POST(req: Request) {
   let slug = "";
@@ -25,42 +27,54 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Passcode required." }, { status: 401 });
   }
 
-  const apiKey = await getBundleApiKeyForPage(page);
+  const provider = pageProvider(page);
+  const apiKey = await getApiKeyForPage(page, provider);
   if (!apiKey) return NextResponse.json({ error: "not-configured" }, { status: 503 });
 
   const settings = await getSettings();
   const siteUrl = await getSiteUrl();
 
-  // 1) Placeholder team; renamed to the Instagram username after OAuth.
+  // 1) Placeholder team/profile; renamed to the Instagram username after OAuth.
   const placeholder = `Pending · ${page.slug} · ${Math.random().toString(36).slice(2, 6)}`.slice(0, 80);
-  let team;
+  let container: { id: string; name: string };
   try {
-    team = await bundle.createTeam(apiKey, { name: placeholder });
+    container =
+      provider === "postpeer"
+        ? await postpeer.createProfile(apiKey, placeholder)
+        : await bundle.createTeam(apiKey, { name: placeholder });
   } catch (err) {
-    console.error("[connect/start] createTeam failed", err);
-    return NextResponse.json({ error: "Could not create a team in bundle.social." }, { status: 502 });
+    console.error(`[connect/start] ${provider} create container failed`, err);
+    return NextResponse.json({ error: `Could not create a ${provider === "postpeer" ? "profile" : "team"} in ${PROVIDER_LABEL[provider]}.` }, { status: 502 });
   }
 
-  const connection = await createConnection({ page_id: page.id, team_id: team.id, team_name: team.name });
+  const connection = await createConnection({ page_id: page.id, provider, team_id: container.id, team_name: container.name });
 
-  // 2) OAuth URL. bundle.social appends its callback params to redirectUrl.
+  // 2) OAuth URL. The provider sends the visitor back to our callback afterwards.
   const redirectUrl = `${siteUrl}/api/connect/callback?c=${encodeURIComponent(connection.id)}`;
   try {
-    const { url } = await bundle.connectSocialAccount(apiKey, {
-      type: "INSTAGRAM",
-      teamId: team.id,
-      redirectUrl,
-      instagramConnectionMethod: settings.instagramConnectionMethod,
-      disableAutoLogin: settings.disableAutoLogin,
-      withBusinessScope: settings.instagramConnectionMethod === "FACEBOOK" ? settings.withBusinessScope : false,
-      forceBrowserOAuth: settings.instagramConnectionMethod === "INSTAGRAM",
-    });
+    const { url } =
+      provider === "postpeer"
+        ? await postpeer.getInstagramConnectUrl(apiKey, {
+            profileId: container.id,
+            redirectUri: redirectUrl,
+            facebookLogin: settings.instagramConnectionMethod === "FACEBOOK",
+          })
+        : await bundle.connectSocialAccount(apiKey, {
+            type: "INSTAGRAM",
+            teamId: container.id,
+            redirectUrl,
+            instagramConnectionMethod: settings.instagramConnectionMethod,
+            disableAutoLogin: settings.disableAutoLogin,
+            withBusinessScope: settings.instagramConnectionMethod === "FACEBOOK" ? settings.withBusinessScope : false,
+            forceBrowserOAuth: settings.instagramConnectionMethod === "INSTAGRAM",
+          });
     return NextResponse.json({ url });
   } catch (err) {
-    console.error("[connect/start] connectSocialAccount failed", err);
+    console.error(`[connect/start] ${provider} connect URL failed`, err);
     await updateConnection(connection.id, { status: "failed", error_code: "connect-url-failed" });
     try {
-      await bundle.deleteTeam(apiKey, team.id);
+      if (provider === "postpeer") await postpeer.deleteProfile(apiKey, container.id);
+      else await bundle.deleteTeam(apiKey, container.id);
     } catch {
       /* best effort */
     }

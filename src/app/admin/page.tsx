@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getSettings, listPages } from "@/lib/db";
+import { getSettings, listPages, pageProvider } from "@/lib/db";
+import { PROVIDER_LABEL } from "@/lib/supabase";
 import { getSiteUrl } from "@/lib/session";
 import { CopyButton } from "@/components/CopyButton";
 import { CreatePageForm } from "./CreatePageForm";
@@ -21,9 +22,9 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      {!settings.hasApiKey && (
+      {!settings.hasApiKey && !settings.hasPostpeerKey && (
         <p className="alert-warn">
-          No global bundle.social API key configured. Pages without their own key will not work until you add one in{" "}
+          No global API key configured. Pages without their own key will not work until you add one in{" "}
           <Link href="/admin/settings" className="underline">
             Settings
           </Link>
@@ -57,7 +58,10 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                       ) : (
                         <span className="badge border-border text-muted">Public</span>
                       )}
-                      {p.bundle_api_key_enc && <span className="badge border-success/40 bg-success/10 text-success">Own API key</span>}
+                      <span className="badge border-border text-muted">{PROVIDER_LABEL[pageProvider(p)]}</span>
+                      {(pageProvider(p) === "postpeer" ? p.postpeer_api_key_enc : p.bundle_api_key_enc) && (
+                        <span className="badge border-success/40 bg-success/10 text-success">Own API key</span>
+                      )}
                     </div>
                     <a href={url} target="_blank" rel="noreferrer" className="mt-0.5 block truncate text-sm text-muted hover:text-fg">
                       {url}

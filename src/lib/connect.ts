@@ -1,6 +1,7 @@
 import "server-only";
 import { bundle, toTeamName, type BundleSocialAccount } from "./bundle";
 import { updateConnection } from "./db";
+import { postpeer, type PostPeerIntegration } from "./postpeer";
 import type { ChannelOption, ConnectionRow } from "./supabase";
 
 /** Best available handle for an Instagram social account. */
@@ -66,15 +67,40 @@ export async function finalizeConnection(
   return { username, teamName };
 }
 
-/** Mark the attempt failed and remove the empty placeholder team (best effort). */
+/** Rename the PostPeer profile to the Instagram username and mark the connection complete. */
+export async function finalizePostpeerConnection(
+  apiKey: string,
+  connection: ConnectionRow,
+  integration: PostPeerIntegration,
+): Promise<{ username: string; teamName: string }> {
+  const username = integration.displayName?.trim().replace(/^@+/, "") || `instagram-${integration.id.slice(0, 8)}`;
+  let teamName = username.slice(0, 200);
+  try {
+    await postpeer.updateProfile(apiKey, connection.team_id, teamName);
+  } catch {
+    teamName = connection.team_name ?? teamName;
+  }
+
+  await updateConnection(connection.id, {
+    status: "connected",
+    instagram_username: username,
+    team_name: teamName,
+    social_account_id: integration.id,
+    channels: null,
+    error_code: null,
+  });
+  return { username, teamName };
+}
+
+/** Mark the attempt failed and remove the empty placeholder team/profile (best effort). */
 export async function failConnection(apiKey: string | null, connection: ConnectionRow, errorCode: string): Promise<void> {
   await updateConnection(connection.id, { status: "failed", error_code: errorCode.slice(0, 120) });
-  if (apiKey) {
-    try {
-      await bundle.deleteTeam(apiKey, connection.team_id);
-    } catch {
-      // Leave the empty team in place; it is harmless.
-    }
+  if (!apiKey) return;
+  try {
+    if (connection.provider === "postpeer") await postpeer.deleteProfile(apiKey, connection.team_id);
+    else await bundle.deleteTeam(apiKey, connection.team_id);
+  } catch {
+    // Leave the empty team/profile in place; it is harmless.
   }
 }
 

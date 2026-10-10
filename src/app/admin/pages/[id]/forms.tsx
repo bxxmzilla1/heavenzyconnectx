@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { savePageApiKeyAction, setPagePasscodeAction, updatePageAction } from "@/actions/pages";
+import { savePageApiKeyAction, setPagePasscodeAction, setPageProviderAction, updatePageAction } from "@/actions/pages";
+import { PROVIDER_LABEL, type Provider } from "@/lib/providers";
 import { initialActionState } from "@/actions/types";
 import { ActionMessage } from "@/components/ActionMessage";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -42,15 +43,39 @@ export function EditPageForm({ page, siteUrl }: { page: { id: string; title: str
   );
 }
 
-export function PageApiKeyForm({ pageId, hasKey }: { pageId: string; hasKey: boolean }) {
+export function ProviderForm({ pageId, provider }: { pageId: string; provider: Provider }) {
+  const [state, action] = useActionState(setPageProviderAction, initialActionState);
+
+  return (
+    <form action={action} className="space-y-3">
+      <input type="hidden" name="id" value={pageId} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        {(["bundle", "postpeer"] as const).map((p) => (
+          <label
+            key={p}
+            className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-panel-2 p-4 has-[:checked]:border-accent"
+          >
+            <input type="radio" name="provider" value={p} defaultChecked={provider === p} />
+            <span className="font-medium">{PROVIDER_LABEL[p]}</span>
+          </label>
+        ))}
+      </div>
+      <ActionMessage state={state} />
+      <SubmitButton className="btn btn-secondary">Save provider</SubmitButton>
+    </form>
+  );
+}
+
+export function PageApiKeyForm({ pageId, provider, hasKey }: { pageId: string; provider: Provider; hasKey: boolean }) {
   const [state, action] = useActionState(savePageApiKeyAction, initialActionState);
 
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="id" value={pageId} />
+      <input type="hidden" name="provider" value={provider} />
       <div>
         <label htmlFor="apiKey" className="label">
-          {hasKey ? "Replace this page's API key" : "API key for this page"}
+          {hasKey ? `Replace this page's ${PROVIDER_LABEL[provider]} key` : `${PROVIDER_LABEL[provider]} key for this page`}
         </label>
         <input
           id="apiKey"
@@ -59,7 +84,7 @@ export function PageApiKeyForm({ pageId, hasKey }: { pageId: string; hasKey: boo
           required
           autoComplete="off"
           className="input font-mono"
-          placeholder="pk_live_…"
+          placeholder={provider === "postpeer" ? "PostPeer access key" : "pk_live_…"}
         />
       </div>
       <ActionMessage state={state} />

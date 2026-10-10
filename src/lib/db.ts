@@ -7,6 +7,7 @@ import {
   type ChannelOption,
   type InstagramConnectionMethod,
   type PageRow,
+  type Provider,
   type SettingsRow,
 } from "./supabase";
 
@@ -46,7 +47,7 @@ export async function createPage(input: { slug: string; title: string; passcode_
 
 export async function updatePage(
   id: string,
-  patch: Partial<Pick<PageRow, "slug" | "title" | "passcode_hash" | "bundle_api_key_enc">>,
+  patch: Partial<Pick<PageRow, "slug" | "title" | "passcode_hash" | "bundle_api_key_enc" | "postpeer_api_key_enc" | "provider">>,
 ): Promise<PageRow> {
   const { data, error } = await supabaseAdmin()
     .from("pages")
@@ -58,18 +59,30 @@ export async function updatePage(
   return data as PageRow;
 }
 
-export async function setPageApiKey(id: string, apiKey: string | null): Promise<void> {
-  await updatePage(id, { bundle_api_key_enc: apiKey ? encryptSecret(apiKey) : null });
+export function pageProvider(page: PageRow): Provider {
+  return page.provider === "postpeer" ? "postpeer" : "bundle";
 }
 
-/** Last 4 characters of the page's own API key, or null if it uses the global key. */
-export function pageApiKeyHint(page: PageRow): string | null {
-  if (!page.bundle_api_key_enc) return null;
+function pageKeyColumn(provider: Provider): "bundle_api_key_enc" | "postpeer_api_key_enc" {
+  return provider === "postpeer" ? "postpeer_api_key_enc" : "bundle_api_key_enc";
+}
+
+export async function setPageApiKey(id: string, provider: Provider, apiKey: string | null): Promise<void> {
+  await updatePage(id, { [pageKeyColumn(provider)]: apiKey ? encryptSecret(apiKey) : null });
+}
+
+function keyHint(enc: string | null | undefined): string | null {
+  if (!enc) return null;
   try {
-    return decryptSecret(page.bundle_api_key_enc).slice(-4);
+    return decryptSecret(enc).slice(-4);
   } catch {
     return "????";
   }
+}
+
+/** Last 4 characters of the page's own key for that provider, or null if it uses the global key. */
+export function pageApiKeyHint(page: PageRow, provider: Provider): string | null {
+  return keyHint(page[pageKeyColumn(provider)]);
 }
 
 export async function deletePage(id: string): Promise<void> {
@@ -104,10 +117,18 @@ export async function getConnection(id: string): Promise<ConnectionRow | null> {
   return (data as ConnectionRow) ?? null;
 }
 
-export async function createConnection(input: { page_id: string; team_id: string; team_name: string }): Promise<ConnectionRow> {
+export async function createConnection(input: {
+  page_id: string;
+  provider: Provider;
+  team_id: string;
+  team_name: string;
+}): Promise<ConnectionRow> {
+  const { provider, ...rest } = input;
+  // Leave `provider` to the column default for bundle so databases without the PostPeer migration keep working.
+  const row = provider === "bundle" ? rest : input;
   const { data, error } = await supabaseAdmin()
     .from("connections")
-    .insert({ ...input, status: "pending" satisfies ConnectionStatus })
+    .insert({ ...row, status: "pending" satisfies ConnectionStatus })
     .select("*")
     .single();
   if (error) throw error;
@@ -143,6 +164,8 @@ export type Settings = {
   hasApiKey: boolean;
   /** Last 4 characters of the API key, for display only. */
   apiKeyHint: string | null;
+  hasPostpeerKey: boolean;
+  postpeerKeyHint: string | null;
   instagramConnectionMethod: InstagramConnectionMethod;
   disableAutoLogin: boolean;
   withBusinessScope: boolean;
@@ -156,18 +179,11 @@ async function getSettingsRow(): Promise<SettingsRow | null> {
 
 export async function getSettings(): Promise<Settings> {
   const row = await getSettingsRow();
-  let hint: string | null = null;
-  if (row?.bundle_api_key_enc) {
-    try {
-      const key = decryptSecret(row.bundle_api_key_enc);
-      hint = key.slice(-4);
-    } catch {
-      hint = "????";
-    }
-  }
   return {
     hasApiKey: Boolean(row?.bundle_api_key_enc),
-    apiKeyHint: hint,
+    apiKeyHint: keyHint(row?.bundle_api_key_enc),
+    hasPostpeerKey: Boolean(row?.postpeer_api_key_enc),
+    postpeerKeyHint: keyHint(row?.postpeer_api_key_enc),
     instagramConnectionMethod: row?.instagram_connection_method ?? "INSTAGRAM",
     disableAutoLogin: row?.disable_auto_login ?? true,
     withBusinessScope: row?.with_business_scope ?? false,
@@ -181,20 +197,38 @@ export async function getBundleApiKey(): Promise<string | null> {
   return decryptSecret(row.bundle_api_key_enc);
 }
 
-/** The page's own API key if it has one, otherwise the global key from Settings. */
+/** Decrypted global PostPeer API key, or null if not configured. */
+export async function getPostpeerApiKey(): Promise<string | null> {
+  const row = await getSettingsRow();
+  if (!row?.postpeer_api_key_enc) return null;
+  return decryptSecret(row.postpeer_api_key_enc);
+}
+
+/** The page's own bundle.social key if it has one, otherwise the global key from Settings. */
 export async function getBundleApiKeyForPage(page: PageRow): Promise<string | null> {
   if (page.bundle_api_key_enc) return decryptSecret(page.bundle_api_key_enc);
   return getBundleApiKey();
 }
 
+/** Key for the given provider: the page's own key if set, otherwise the global key. */
+export async function getApiKeyForPage(page: PageRow, provider: Provider = pageProvider(page)): Promise<string | null> {
+  if (provider === "bundle") return getBundleApiKeyForPage(page);
+  if (page.postpeer_api_key_enc) return decryptSecret(page.postpeer_api_key_enc);
+  return getPostpeerApiKey();
+}
+
 export async function saveSettings(patch: {
   apiKey?: string | null; // undefined = leave unchanged, null = clear
+  postpeerApiKey?: string | null;
   instagramConnectionMethod?: InstagramConnectionMethod;
   disableAutoLogin?: boolean;
   withBusinessScope?: boolean;
 }): Promise<void> {
   const update: Record<string, unknown> = { id: SETTINGS_ID, updated_at: new Date().toISOString() };
   if (patch.apiKey !== undefined) update.bundle_api_key_enc = patch.apiKey ? encryptSecret(patch.apiKey) : null;
+  if (patch.postpeerApiKey !== undefined) {
+    update.postpeer_api_key_enc = patch.postpeerApiKey ? encryptSecret(patch.postpeerApiKey) : null;
+  }
   if (patch.instagramConnectionMethod !== undefined) update.instagram_connection_method = patch.instagramConnectionMethod;
   if (patch.disableAutoLogin !== undefined) update.disable_auto_login = patch.disableAutoLogin;
   if (patch.withBusinessScope !== undefined) update.with_business_scope = patch.withBusinessScope;
