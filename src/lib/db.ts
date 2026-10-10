@@ -18,13 +18,20 @@ export async function listPages(): Promise<(PageRow & { connected_count: number 
   const { data: pages, error } = await sb.from("pages").select("*").order("created_at", { ascending: false });
   if (error) throw error;
 
-  const { data: conns, error: cErr } = await sb.from("connections").select("page_id").eq("status", "connected");
-  if (cErr) throw cErr;
+  // Count queries are exact and not subject to the 1000-row response cap.
+  const counts = await Promise.all(
+    (pages ?? []).map(async (p) => {
+      const { count, error: cErr } = await sb
+        .from("connections")
+        .select("id", { count: "exact", head: true })
+        .eq("page_id", p.id)
+        .eq("status", "connected");
+      if (cErr) throw cErr;
+      return count ?? 0;
+    }),
+  );
 
-  const counts = new Map<string, number>();
-  for (const c of conns ?? []) counts.set(c.page_id, (counts.get(c.page_id) ?? 0) + 1);
-
-  return (pages ?? []).map((p) => ({ ...(p as PageRow), connected_count: counts.get(p.id) ?? 0 }));
+  return (pages ?? []).map((p, i) => ({ ...(p as PageRow), connected_count: counts[i] }));
 }
 
 export async function getPageById(id: string): Promise<PageRow | null> {
@@ -96,14 +103,23 @@ export function isUniqueViolation(err: unknown): boolean {
 
 /* ----------------------------- Connections ------------------------------ */
 
+/** Supabase caps each response at 1000 rows, so read in pages until exhausted. */
+const PAGE_SIZE = 1000;
+
 export async function listConnectionsForPage(pageId: string): Promise<ConnectionRow[]> {
-  const { data, error } = await supabaseAdmin()
-    .from("connections")
-    .select("*")
-    .eq("page_id", pageId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as ConnectionRow[];
+  const rows: ConnectionRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabaseAdmin()
+      .from("connections")
+      .select("*")
+      .eq("page_id", pageId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as ConnectionRow[]));
+    if (!data || data.length < PAGE_SIZE) return rows;
+  }
 }
 
 export async function deleteConnectionsForPage(pageId: string): Promise<void> {
